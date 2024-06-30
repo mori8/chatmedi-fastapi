@@ -1,0 +1,38 @@
+[
+  {
+    "example_input": "What are the common symptoms of type 2 diabetes?",
+    "example_output": "[{{\"task\": \"question-answering-about-medical-domain\", \"id\": 0, \"dep\": [-1], \"args\": {{\"question\": \"What are the common symptoms of type 2 diabetes?\", \"context\": \"Type 2 diabetes is a chronic condition that affects the way your body metabolizes sugar (glucose). Common symptoms include increased thirst, frequent urination, hunger, fatigue, and blurred vision.\"}}}}]"
+  },
+  {
+    "example_input": "A patient has been experiencing chest pain and shortness of breath. Based on these symptoms, what could be the possible diagnosis?",
+    "example_output": "[{{\"task\": \"question-answering-about-medical-domain\", \"id\": 0, \"dep\": [-1], \"args\": {{\"question\": \"Based on these symptoms, what could be the possible diagnosis?\", \"context\": \"A patient has been experiencing chest pain and shortness of breath.\"}}}}]"
+  },
+  {
+    "example_input": "What is the abnormality shown in this chest X-ray image? /chest_xray.jpg",
+    "example_output": "[{{\"task\": \"visual-question-answering-about-medical-domain\", \"id\": 0, \"dep\": [-1], \"args\": {{\"text\": \"What is the abnormality shown in this chest X-ray image?\", \"image\": \"/chest_xray.jpg\"}}}}]"
+  },
+  {
+    "example_input": "Identify the type of fracture in this X-ray image of the femur. [femur_xray.jpg]",
+    "example_output": "[{{\"task\": \"visual-question-answering-about-medical-domain\", \"id\": 0, \"dep\": [-1], \"args\": {{\"text\": \"Identify the type of fracture in this X-ray image of the femur.\", \"image\": \"femur_xray.jpg\"}}}}]"
+  },
+  {
+    "example_input": "Generate an image of a healthy lung based on the following description: 'A normal chest X-ray showing clear lung fields without any abnormalities.'",
+    "example_output": "[{{\"task\": \"text-to-image\", \"id\": 0, \"dep\": [-1], \"args\": {{\"text\": \"A normal chest X-ray showing clear lung fields without any abnormalities.\"}}}}]"
+  },
+  {
+    "example_input": "Create an illustration of the human heart with labeled anatomical structures based on this text: 'The human heart consists of four chambers: right atrium, left atrium, right ventricle, and left ventricle. The heart valves, including the tricuspid, pulmonary, mitral, and aortic valves, regulate blood flow.'",
+    "example_output": "[{{\"task\": \"text-to-image\", \"id\": 0, \"dep\": [-1], \"args\": {{\"text\": \"The human heart consists of four chambers: right atrium, left atrium, right ventricle, and left ventricle. The heart valves, including the tricuspid, pulmonary, mitral, and aortic valves, regulate blood flow.\"}}}}]"
+  },
+  {
+    "example_input": "I have an X-ray image of my left knee that shows cartilage damage. Can you highlight the damaged area and explain the common treatment options for this condition? /left_knee_xray.jpg",
+    "example_output": "[{{\"task\": \"medical-image-segmentation\", \"id\": 0, \"dep\": [-1], \"args\": {{\"image\": \"left_knee_xray.jpg\"}}}}, {{\"task\": \"visual-question-answering-about-medical-domain\", \"id\": 1, \"dep\": [0], \"args\": {{\"text\": \"What is the abnormality shown in the segmented region of this knee X-ray image?\", \"image\": \"<GENERATED>-0\"}}}}, {{\"task\": \"question-answering-about-medical-domain\", \"id\": 2, \"dep\": [1], \"args\": {{\"text\": \"What are the common treatment options for cartilage damage in the knee as shown in the X-ray?\"}}}}]"
+  },
+  {
+    "example_input": "Please detect the pneumonia-affected areas in this lung CT scan image and briefly explain the symptoms and treatment of pneumonia. /lung_ct_scan.jpg",
+    "example_output": "[{{\"task\": \"medical-image-segmentation\", \"id\": 0, \"dep\": [-1], \"args\": {{\"image\": \"lung_ct_scan.jpg\"}}}}, {{\"task\": \"visual-question-answering-about-medical-domain\", \"id\": 1, \"dep\": [0], \"args\": {{\"text\": \"What abnormality is highlighted in the segmented region of this lung CT scan?\", \"image\": \"<GENERATED>-0\"}}}}, {{\"task\": \"question-answering-about-medical-domain\", \"id\": 2, \"dep\": [1], \"args\": {{\"text\": \"What are the common symptoms and treatment options for pneumonia?\"}}}}]"
+  },
+  {
+    "example_input": "Can you identify the brain tumor area in this MRI image and provide information on the symptoms and surgical treatment options based on the tumor's location? /brain_mri.jpg",
+    "example_output": "[{{\"task\": \"medical-image-segmentation\", \"id\": 0, \"dep\": [-1], \"args\": {{\"image\": \"brain_mri.jpg\"}}}}, {{\"task\": \"visual-question-answering-about-medical-domain\", \"id\": 1, \"dep\": [0], \"args\": {{\"text\": \"Where is the brain tumor located based on the segmented MRI image?\", \"image\": \"<GENERATED>-0\"}}}}, {{\"task\": \"question-answering-about-medical-domain\", \"id\": 2, \"dep\": [1], \"args\": {{\"text\": \"What are the symptoms and surgical treatment options for a brain tumor located in <GENERATED>-1?\"}}}}]"
+  }
+]
