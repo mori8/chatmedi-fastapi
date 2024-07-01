@@ -7,6 +7,7 @@ import logging
 import asyncio
 import json
 from dotenv import load_dotenv
+from utils.log import setup_logging
 from utils.history import ConversationHistory
 from utils.llm_factory import LLMs, create_llms
 from utils.task_parsing import parse_tasks, Task
@@ -18,7 +19,7 @@ from utils.response_generation import generate_response, format_response
 
 load_dotenv()
 # 로깅 설정
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 logger = logging.getLogger(__name__)
 llms = create_llms()
 
