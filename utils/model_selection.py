@@ -45,7 +45,11 @@ async def select_hf_models(
                         )
                     )
                 )
-        results = await asyncio.gather(*aio_tasks)
+        try:
+            results = await asyncio.gather(*aio_tasks)
+        except Exception as e:
+            logger.error(f"Error occurred: {e}")
+            raise
         return {task_id: model for task_id, model in results}
 
 
@@ -59,10 +63,14 @@ async def select_model(
 ) -> (int, Model):
     logger.info(f"Starting model selection for task: {task.task}")
 
-    top_k_models = await get_top_k_models(
-        task=task.task, top_k=5, max_description_length=100, session=session
-    )
-    # TODO: 여기 수정 필요
+    try:
+        top_k_models = await get_top_k_models(
+            task=task.task, top_k=5, max_description_length=100, session=session
+        )
+    except Exception as e:
+        logger.error(f"Error fetching top k models for task {task.task}: {e}")
+        raise
+
     if task.task in [
         "summarization",
         "translation",
@@ -75,23 +83,27 @@ async def select_model(
             reason="Text generation tasks are best handled by OpenAI models",
         )
     else:
-        prompt_template = load_prompt(
-            get_prompt_resource("model-selection-prompt.json")
-        )
-        llm_chain = LLMChain(prompt=prompt_template, llm=model_selection_llm)
-        # Need to replace double quotes with single quotes for correct response generation
-        task_str = task.json().replace('"', "'")
-        models_str = json.dumps(top_k_models).replace('"', "'")
-        output = await llm_chain.apredict(
-            user_input=user_input, task=task_str, models=models_str, stop=["<im_end>"]
-        )
-        logger.debug(f"Model selection raw output: {output}")
+        try:
+            prompt_template = load_prompt(
+                get_prompt_resource("model-selection-prompt.json")
+            )
+            llm_chain = LLMChain(prompt=prompt_template, llm=model_selection_llm)
+            # Need to replace double quotes with single quotes for correct response generation
+            task_str = task.json().replace('"', "'")
+            models_str = json.dumps(top_k_models).replace('"', "'")
+            output = await llm_chain.apredict(
+                user_input=user_input, task=task_str, models=models_str, stop=["<im_end>"]
+            )
+            logger.debug(f"Model selection raw output: {output}")
 
-        parser = PydanticOutputParser(pydantic_object=Model)
-        fixing_parser = OutputFixingParser.from_llm(
-            parser=parser, llm=output_fixing_llm
-        )
-        model = fixing_parser.parse(output)
+            parser = PydanticOutputParser(pydantic_object=Model)
+            fixing_parser = OutputFixingParser.from_llm(
+                parser=parser, llm=output_fixing_llm
+            )
+            model = fixing_parser.parse(output)
+        except Exception as e:
+            logger.error(f"Error during model selection for task {task.task}: {e}")
+            raise
 
     logger.info(f"For task: {task.task}, selected model: {model}")
     return task.id, model

@@ -157,5 +157,3 @@ async def execute_tasks(prompt: str = Form(...), history: Optional[str] = Form(N
         logger.error(f"Failed to execute tasks: {e}")
         return []
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)

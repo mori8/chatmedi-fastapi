@@ -392,12 +392,66 @@ class TextGeneration:
     def parse_response(self, response):
         return response.json()
 
+class CXRToReportGeneration:
+    def __init__(self, task: Task):
+        self.task = task
+
+    @property
+    def inference_inputs(self):
+        data = {
+            "inputs": {
+                "instruction": "Generate radiology reports for the entered CXR image.",
+                "input": self.task.args["image"],
+            }
+        }
+        return json.dumps(data)
+
+    def parse_response(self, response):
+        return response["result_text"]
+    
+class ReportToCXRGeneration:
+    def __init__(self, task: Task):
+        self.task = task
+
+    @property
+    def inference_inputs(self):
+        data = {
+            "inputs": {
+                "instruction": "Generate a chest X-ray image that corresponds to the entered free-text radiology reports for the chest X-ray image.",
+                "input": self.task.args["text"],
+            }
+        }
+        return json.dumps(data)
+
+    def parse_response(self, response):
+        image = image_from_bytes(response["result_img"])
+        path = save_image(image)
+        return {"generated image": path}
+    
+class CXRVQA:
+    def __init__(self, task: Task):
+        self.task = task
+
+    @property
+    def inference_inputs(self):
+        img_data = encode_image(self.task.args["image"])
+        img_base64 = base64.b64encode(img_data).decode("utf-8")
+        data = {
+            "inputs": {
+                "question": self.task.args["text"],
+                "image": img_base64,
+            }
+        }
+        return json.dumps(data)
+
+    def parse_response(self, response):
+        return response["result_text"]
+
 
 HUGGINGFACE_TASKS = {
-    "question-answering-about-medical-domain": QuestionAnswering,
-    "visual-question-answering-about-medical-domain": VisualQuestionAnswering,
-    "text-to-image": TextToImage,
-    "medical-image-segmentation": ImageSegmentation,
+    "cxr-to-report-generation": CXRToReportGeneration,
+    "report-to-cxr-generation": ReportToCXRGeneration,
+    "cxr-visual-qestion-answering": CXRVQA,
 }
 
 
