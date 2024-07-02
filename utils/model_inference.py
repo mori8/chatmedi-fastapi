@@ -31,7 +31,7 @@ from utils.task_parsing import Task
 logger = logging.getLogger(__name__)
 
 
-@wrap_exceptions(ModelInferenceException, "Error during model inference")
+# @wrap_exceptions(ModelInferenceException, "Error during model inference")
 def infer(task: Task, model_id: str, llm: BaseLLM, session: requests.Session):
     """Execute a task either with LLM or huggingface inference API."""
     if model_id == "openai":
@@ -58,18 +58,35 @@ def infer_openai(task: Task, llm: BaseLLM):
 def infer_huggingface(task: Task, model_id: str, session: requests.Session):
     logger.info("Starting huggingface inference")
 
-    url = HUGGINGFACE_INFERENCE_API_URL + model_id
-    if model_id == "BioMistral/BioMistral-7B":
-        url = "https://kyiu7f36yx8hombe.us-east-1.aws.endpoints.huggingface.cloud"
+    with open("resources/huggingface-models-metadata.jsonl") as f:
+        for line in f:
+            model_data = json.loads(line)
+            if model_data["id"] == model_id:
+                endpoint = model_data["endpoint"]
+                break
     
     huggingface_task = create_huggingface_task(task=task)
     data = huggingface_task.inference_inputs
+    # print(data)
     headers = get_hf_headers()
-    response = session.post(url, headers=headers, data=data)
-    response.raise_for_status()
-    result = huggingface_task.parse_response(response)
-    logger.debug(f"Inference result: {result}")
-    return result
+    # print(headers)
+    try:
+        print(data)
+        response = session.post(endpoint, headers=headers, json=data)
+        print(response.json())
+        response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful status code
+        result = huggingface_task.parse_response(response.json())
+        logger.debug(f"Inference result: {result}")
+        return result
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error occurred: {e}")
+        logger.error(f"Response status code: {e.response.status_code}")
+        logger.error(f"Response headers: {e.response.headers}")
+        logger.error(f"Response body: {e.response.text}")
+        raise
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request failed: {e}")
+        raise
 
 
 # NLP Tasks
@@ -404,7 +421,7 @@ class CXRToReportGeneration:
                 "input": self.task.args["image"],
             }
         }
-        return json.dumps(data)
+        return data
 
     def parse_response(self, response):
         return response["result_text"]
@@ -421,7 +438,8 @@ class ReportToCXRGeneration:
                 "input": self.task.args["text"],
             }
         }
-        return json.dumps(data)
+        # print(json.dumps(data))
+        return data
 
     def parse_response(self, response):
         image = image_from_bytes(response["result_img"])
@@ -442,7 +460,7 @@ class CXRVQA:
                 "image": img_base64,
             }
         }
-        return json.dumps(data)
+        return data
 
     def parse_response(self, response):
         return response["result_text"]

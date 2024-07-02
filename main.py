@@ -5,6 +5,7 @@ from typing import List, Optional, Dict
 import uvicorn
 import logging
 import asyncio
+import requests
 import json
 from dotenv import load_dotenv
 from utils.log import setup_logging
@@ -62,6 +63,11 @@ class ModelSelectionRequest(BaseModel):
 class ModelSelectionResponse(BaseModel):
     selected_models: Dict[int, Model]
 
+class ModelExecutionRequest(BaseModel):
+    user_input: str
+    tasks: List[Task]
+    selected_models: Dict[int, Model]
+
 
 @app.post("/parse-task", response_model=List[TaskResponse])
 async def parse_task(prompt: str = Form(...), image: Optional[UploadFile] = File(None)):
@@ -102,31 +108,16 @@ async def select_model(request: ModelSelectionRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/execute-tasks", response_model=List[TaskSummaryResponse])
-async def execute_tasks(prompt: str = Form(...), history: Optional[str] = Form(None)):
+async def execute_tasks(request: ModelExecutionRequest):
     try:
-        history_obj = ConversationHistory.parse_raw(history) if history else ConversationHistory(messages=[])
-        
-        # Task Planning
-        tasks = plan_tasks(prompt, history_obj, llms.task_planning_llm)
-        sorted(tasks, key=lambda t: max(t.dep))
-        logger.info(f"Sorted tasks: {tasks}")
-
-        # Model Selection
-        hf_models = await select_hf_models(
-            user_input=prompt,
-            tasks=tasks,
-            model_selection_llm=llms.model_selection_llm,
-            output_fixing_llm=llms.output_fixing_llm,
-        )
-
         # Model Inference
         task_summaries = []
         with requests.Session() as session:
-            for task in tasks:
+            for task in request.tasks:
                 logger.info(f"Starting task: {task}")
                 if task.depends_on_generated_resources():
                     task = task.replace_generated_resources(task_summaries=task_summaries)
-                model = hf_models[task.id]
+                model = request.selected_models[task.id]
                 inference_result = infer(
                     task=task,
                     model_id=model.id,
@@ -156,4 +147,3 @@ async def execute_tasks(prompt: str = Form(...), history: Optional[str] = Form(N
     except Exception as e:
         logger.error(f"Failed to execute tasks: {e}")
         return []
-
