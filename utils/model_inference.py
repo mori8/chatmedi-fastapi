@@ -2,6 +2,8 @@ import base64
 import json
 import logging
 import random
+import numpy as np
+import base64
 from io import BytesIO
 from typing import Any
 
@@ -71,9 +73,7 @@ def infer_huggingface(task: Task, model_id: str, session: requests.Session):
     headers = get_hf_headers()
     # print(headers)
     try:
-        print(data)
         response = session.post(endpoint, headers=headers, json=data)
-        print(response.json())
         response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful status code
         result = huggingface_task.parse_response(response.json())
         logger.debug(f"Inference result: {result}")
@@ -424,7 +424,7 @@ class CXRToReportGeneration:
         return data
 
     def parse_response(self, response):
-        return response["result_text"]
+        return {"result": response["result_text"]}
     
 class ReportToCXRGeneration:
     def __init__(self, task: Task):
@@ -438,13 +438,21 @@ class ReportToCXRGeneration:
                 "input": self.task.args["text"],
             }
         }
-        # print(json.dumps(data))
         return data
 
     def parse_response(self, response):
-        image = image_from_bytes(response["result_img"])
-        path = save_image(image)
-        return {"generated image": path}
+        rgb_data = response["result_img"]
+        rgb_array = np.array(rgb_data, dtype=np.uint8)
+
+        image = Image.fromarray(rgb_array, 'RGB')
+        
+        # 바이트 버퍼에 이미지 저장
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        
+        # Base64 인코딩
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return {"result": img_str}
     
 class CXRVQA:
     def __init__(self, task: Task):

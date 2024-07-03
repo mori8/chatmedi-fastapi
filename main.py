@@ -134,12 +134,12 @@ async def execute_tasks(request: ModelExecutionRequest):
                 logger.info(f"Finished task: {task}")
         logger.info("Finished all tasks")
         logger.debug(f"Task summaries: {task_summaries}")
-
+        
         return [
             TaskSummaryResponse(
                 task=TaskResponse(**summary.task.dict()),
-                model=summary.model,
-                inference_result=summary.inference_result
+                model=summary.model.id,
+                inference_result=summary.inference_result['result']
             )
             for summary in task_summaries
         ]
