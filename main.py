@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uvicorn
@@ -7,7 +8,10 @@ import logging
 import asyncio
 import requests
 import json
+import shutil
+from pathlib import Path
 from dotenv import load_dotenv
+from utils.save_file import save_file, UPLOAD_DIR
 from utils.log import setup_logging
 from utils.history import ConversationHistory
 from utils.llm_factory import LLMs, create_llms
@@ -24,11 +28,6 @@ setup_logging()
 logger = logging.getLogger(__name__)
 llms = create_llms()
 
-import sys
-
-# 현재 파이썬 버전을 문자열로 출력
-print("Python version:", sys.version)
-print("Python executable:", sys.executable)
 
 app = FastAPI()
 
@@ -54,7 +53,7 @@ class TaskResponse(BaseModel):
 class TaskSummaryResponse(BaseModel):
     task: TaskResponse
     model: str
-    inference_result: str
+    inference_result: Dict[str, str]
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
@@ -128,18 +127,19 @@ async def execute_tasks(request: ModelExecutionRequest):
                     TaskSummary(
                         task=task,
                         model=model,
+                        model_input=task.args,
                         inference_result=json.dumps(inference_result),
                     )
                 )
                 logger.info(f"Finished task: {task}")
         logger.info("Finished all tasks")
         logger.debug(f"Task summaries: {task_summaries}")
-        
+
         return [
             TaskSummaryResponse(
                 task=TaskResponse(**summary.task.dict()),
                 model=summary.model.id,
-                inference_result=summary.inference_result['result']
+                inference_result=summary.inference_result["result"]
             )
             for summary in task_summaries
         ]
@@ -147,3 +147,15 @@ async def execute_tasks(request: ModelExecutionRequest):
     except Exception as e:
         logger.error(f"Failed to execute tasks: {e}")
         return []
+
+@app.post("/upload")
+async def upload_image(file: UploadFile = File(...)):
+    file_location = save_file(file)
+    return {"filename": file.filename, "url": f"/files/{file.filename}"}
+
+@app.get("/files/{filename}")
+async def get_image(filename: str):
+    file_location = UPLOAD_DIR / filename
+    if file_location.exists():
+        return FileResponse(file_location)
+    return {"error": "File not found"}

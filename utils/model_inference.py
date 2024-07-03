@@ -5,7 +5,8 @@ import random
 import numpy as np
 import base64
 from io import BytesIO
-from typing import Any
+from typing import Any, Dict
+from pathlib import Path
 
 import requests
 from PIL import Image, ImageDraw
@@ -13,8 +14,10 @@ from langchain import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.prompts import load_prompt
 from pydantic import BaseModel, Json
+from fastapi import FastAPI, File, UploadFile
 
 from utils.exceptions import ModelInferenceException, wrap_exceptions
+from utils.save_file import save_file
 from utils.huggingface_api import (HUGGINGFACE_INFERENCE_API_URL, get_hf_headers)
 from utils.model_selection import Model
 from utils.resources import (
@@ -424,7 +427,10 @@ class CXRToReportGeneration:
         return data
 
     def parse_response(self, response):
-        return {"result": response["result_text"]}
+        return {"result": {
+            "image": "",
+            "text": response["result_text"]
+        }}
     
 class ReportToCXRGeneration:
     def __init__(self, task: Task):
@@ -440,20 +446,28 @@ class ReportToCXRGeneration:
         }
         return data
 
+    def save_image_locally(self, image: Image) -> str:
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        buffered.seek(0)
+        upload_file = UploadFile(filename="generated_image.png", file=buffered)
+        file_location = save_file(upload_file)
+        return file_location
+
     def parse_response(self, response):
         rgb_data = response["result_img"]
         rgb_array = np.array(rgb_data, dtype=np.uint8)
-
         image = Image.fromarray(rgb_array, 'RGB')
         
-        # 바이트 버퍼에 이미지 저장
-        buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        
-        # Base64 인코딩
-        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        return {"result": img_str}
+        # 로컬에 이미지 저장
+        file_location = self.save_image_locally(image)
+
+        return {"result": {
+            "image": Path(file_location).name,
+            "text": ""
+        }}
     
+
 class CXRVQA:
     def __init__(self, task: Task):
         self.task = task
@@ -464,14 +478,34 @@ class CXRVQA:
         img_base64 = base64.b64encode(img_data).decode("utf-8")
         data = {
             "inputs": {
-                "question": self.task.args["text"],
-                "image": img_base64,
+                "instruction": self.task.args["text"],
+                "input": img_base64,
             }
         }
         return data
 
+    def save_image_locally(self, image: Image) -> str:
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        buffered.seek(0)
+        upload_file = UploadFile(filename="generated_image.png", file=buffered)
+        file_location = save_file(upload_file)
+        return file_location
+
     def parse_response(self, response):
-        return response["result_text"]
+        rgb_data = response["result_img"]
+        rgb_array = np.array(rgb_data, dtype=np.uint8)
+        image = Image.fromarray(rgb_array, 'RGB')
+
+        # 로컬에 이미지 저장
+        file_location = self.save_image_locally(image)
+
+        return {
+            "result": {
+                "image": Path(file_location).name,
+                "text": response["result_text"]
+            }
+        }
 
 
 HUGGINGFACE_TASKS = {
@@ -490,5 +524,6 @@ def create_huggingface_task(task: Task):
 
 class TaskSummary(BaseModel):
     task: Task
+    model_input: Dict[str, str]
     inference_result: Json[Any]
     model: Model
