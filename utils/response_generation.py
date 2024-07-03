@@ -4,17 +4,25 @@ import logging
 from langchain import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.prompts import load_prompt
+from pydantic import BaseModel
+from typing import Dict, List
 
+from utils.task_parsing import Task
+from utils.model_selection import Model
 from utils.exceptions import ResponseGenerationException, wrap_exceptions
-from utils.model_inference import TaskSummary
 from utils.resources import get_prompt_resource, prepend_resource_dir
 
 logger = logging.getLogger(__name__)
 
+class TaskSummariesForFinalResponse(BaseModel):
+    task: Task
+    model: Model
+    inference_result: Dict[str, str]
 
-@wrap_exceptions(ResponseGenerationException, "Failed to generate assistant response")
+
+# @wrap_exceptions(ResponseGenerationException, "Failed to generate assistant response")
 def generate_response(
-    user_input: str, task_summaries: list[TaskSummary], llm: BaseLLM
+    user_input: str, task_summaries: List[TaskSummariesForFinalResponse], llm: BaseLLM
 ) -> str:
     """Use LLM agent to generate a response to the user's input, given task results."""
     logger.info("Starting response generation")
@@ -38,6 +46,6 @@ def format_response(response: str) -> str:
     return response
 
 
-def task_summaries_to_json(task_summaries: list[TaskSummary]) -> str:
+def task_summaries_to_json(task_summaries: List[TaskSummariesForFinalResponse]) -> str:
     dicts = [ts.dict() for ts in task_summaries]
     return json.dumps(dicts)
