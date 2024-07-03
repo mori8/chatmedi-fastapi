@@ -11,6 +11,7 @@ import json
 import shutil
 from pathlib import Path
 from dotenv import load_dotenv
+
 from utils.save_file import save_file, UPLOAD_DIR
 from utils.log import setup_logging
 from utils.history import ConversationHistory
@@ -19,7 +20,7 @@ from utils.task_parsing import parse_tasks, Task
 from utils.task_planning import plan_tasks
 from utils.model_selection import select_hf_models, Model, Task as ModelTask
 from utils.model_inference import infer, TaskSummary
-from utils.response_generation import generate_response, format_response
+from utils.response_generation import generate_response, format_response, TaskSummariesForFinalResponse
 
 
 load_dotenv()
@@ -51,9 +52,19 @@ class TaskResponse(BaseModel):
     args: Dict[str, str]
 
 class TaskSummaryResponse(BaseModel):
-    task: TaskResponse
-    model: str
+    task: Task
+    model: Model
+    model_input: Dict[str, str]
     inference_result: Dict[str, str]
+
+class TaskSummariesForFinalResponse(BaseModel):
+    task: Task
+    model: Model
+    inference_result: Dict[str, str]
+
+class GenerateResponseRequest(BaseModel):
+    user_input: str
+    task_summaries: List[TaskSummariesForFinalResponse]
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
@@ -138,7 +149,8 @@ async def execute_tasks(request: ModelExecutionRequest):
         return [
             TaskSummaryResponse(
                 task=TaskResponse(**summary.task.dict()),
-                model=summary.model.id,
+                model=summary.model,
+                model_input=summary.model_input,
                 inference_result=summary.inference_result["result"]
             )
             for summary in task_summaries
@@ -147,6 +159,18 @@ async def execute_tasks(request: ModelExecutionRequest):
     except Exception as e:
         logger.error(f"Failed to execute tasks: {e}")
         return []
+
+@app.post("/generate-response")
+async def generate_response_endpoint(request: GenerateResponseRequest):
+    try:
+        response = generate_response(
+            user_input=request.user_input,
+            task_summaries=request.task_summaries,
+            llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
+        )
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
