@@ -2,7 +2,8 @@ import logging
 from collections import namedtuple
 
 import tiktoken
-from langchain.chat_models import ChatOpenAI as OpenAI
+from langchain_openai import ChatOpenAI as OpenAI
+from langchain_anthropic import ChatAnthropic as Anthropic
 
 LLM_NAME = "gpt-4o"
 # Encoding for text-davinci-003
@@ -44,13 +45,9 @@ def create_llms() -> LLMs:
             for token_id in task_parsing_highlight_ids
         },
     )
-    model_selection_llm = OpenAI(
-        model_name=LLM_NAME,
-        temperature=0,
-        logit_bias={
-            token_id: MODEL_SELECTION_LOGIT_BIAS
-            for token_id in choose_model_highlight_ids
-        },
+    model_selection_llm = Anthropic(
+        model_name="claude-3-5-sonnet-20240620",
+        temperature=0
     )
     model_inference_llm = OpenAI(model_name=LLM_NAME, temperature=0)
     response_generation_llm = OpenAI(model_name=LLM_NAME, temperature=0)
