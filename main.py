@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 
-from utils.save_file import save_file, UPLOAD_DIR
+from utils.save_file import upload_to_s3
 from utils.log import setup_logging
 from utils.history import ConversationHistory
 from utils.llm_factory import LLMs, create_llms
@@ -174,12 +174,12 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    file_location = save_file(file)
+    file_location = upload_to_s3(file)
     return {"filename": file.filename, "url": f"/files/{file.filename}"}
 
-@app.get("/files/{filename}")
-async def get_image(filename: str):
-    file_location = UPLOAD_DIR / filename
-    if file_location.exists():
-        return FileResponse(file_location)
-    return {"error": "File not found"}
+# @app.get("/files/{filename}")
+# async def get_image(filename: str):
+#     file_location = UPLOAD_DIR / filename
+#     if file_location.exists():
+#         return FileResponse(file_location)
+#     return {"error": "File not found"}

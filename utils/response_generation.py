@@ -26,9 +26,7 @@ def generate_response(
 ) -> str:
     """Use LLM agent to generate a response to the user's input, given task results."""
     logger.info("Starting response generation")
-    print("1")
     sorted_task_summaries = sorted(task_summaries, key=lambda ts: ts.task.id)
-    print("2")
     task_results_str = task_summaries_to_json(sorted_task_summaries)
     prompt_template = load_prompt(
         get_prompt_resource("response-generation-prompt.json")

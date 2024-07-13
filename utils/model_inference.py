@@ -4,6 +4,8 @@ import logging
 import random
 import numpy as np
 import base64
+import boto3
+from uuid import uuid4
 from io import BytesIO
 from typing import Any, Dict
 from pathlib import Path
@@ -17,7 +19,7 @@ from pydantic import BaseModel, Json
 from fastapi import FastAPI, File, UploadFile
 
 from utils.exceptions import ModelInferenceException, wrap_exceptions
-from utils.save_file import save_file
+from utils.save_file import upload_to_s3
 from utils.huggingface_api import (HUGGINGFACE_INFERENCE_API_URL, get_hf_headers)
 from utils.model_selection import Model
 from utils.resources import (
@@ -451,7 +453,7 @@ class ReportToCXRGeneration:
         image.save(buffered, format="PNG")
         buffered.seek(0)
         upload_file = UploadFile(filename="generated_image.png", file=buffered)
-        file_location = save_file(upload_file)
+        file_location = upload_to_s3(upload_file, content_type="image/png")
         return file_location
 
     def parse_response(self, response):
@@ -463,7 +465,7 @@ class ReportToCXRGeneration:
         file_location = self.save_image_locally(image)
 
         return {"result": {
-            "image": Path(file_location).name,
+            "image": file_location,
             "text": ""
         }}
     
@@ -489,7 +491,7 @@ class CXRVQA:
         image.save(buffered, format="PNG")
         buffered.seek(0)
         upload_file = UploadFile(filename="generated_image.png", file=buffered)
-        file_location = save_file(upload_file)
+        file_location = upload_to_s3(upload_file, content_type="image/png")
         return file_location
 
     def parse_response(self, response):
@@ -502,7 +504,7 @@ class CXRVQA:
 
         return {
             "result": {
-                "image": Path(file_location).name,
+                "image": file_location,
                 "text": response["result_text"]
             }
         }
