@@ -420,19 +420,36 @@ class CXRToReportGeneration:
 
     @property
     def inference_inputs(self):
+        if "text" in self.task.args:
+            instruction = self.task.args["text"]
+        else:
+            instruction = "Generate free-text radiology reports for the entered chest X-ray images."
+        img_url = self.task.args["image"]
+        print(img_url)
+        img_array = self.encode_image_from_url(img_url)
         data = {
             "inputs": {
-                "instruction": "Generate radiology reports for the entered CXR image.",
-                "input": self.task.args["image"],
+                "instruction": instruction,
+                "input": img_array,
             }
         }
         return data
 
+    def encode_image_from_url(self, url):
+        response = requests.get(url)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content))
+        img = img.convert("RGB")
+        img_array = np.array(img)
+        return img_array.tolist()
+
     def parse_response(self, response):
-        return {"result": {
-            "image": "",
-            "text": response["result_text"]
-        }}
+        return {
+            "result": {
+                "image": "",
+                "text": response["result_text"]
+            }
+        }
     
 class ReportToCXRGeneration:
     def __init__(self, task: Task):
@@ -470,50 +487,50 @@ class ReportToCXRGeneration:
         }}
     
 
-class CXRVQA:
-    def __init__(self, task: Task):
-        self.task = task
+# class CXRVQA:
+#     def __init__(self, task: Task):
+#         self.task = task
 
-    @property
-    def inference_inputs(self):
-        img_data = encode_image(self.task.args["image"])
-        img_base64 = base64.b64encode(img_data).decode("utf-8")
-        data = {
-            "inputs": {
-                "instruction": self.task.args["text"],
-                "input": img_base64,
-            }
-        }
-        return data
+#     @property
+#     def inference_inputs(self):
+#         img_data = encode_image(self.task.args["image"])
+#         img_base64 = base64.b64encode(img_data).decode("utf-8")
+#         data = {
+#             "inputs": {
+#                 "instruction": self.task.args["text"],
+#                 "input": img_base64,
+#             }
+#         }
+#         return data
 
-    def save_image_locally(self, image: Image) -> str:
-        buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        buffered.seek(0)
-        upload_file = UploadFile(filename="generated_image.png", file=buffered)
-        file_location = upload_to_s3(upload_file, content_type="image/png")
-        return file_location
+#     def save_image_locally(self, image: Image) -> str:
+#         buffered = BytesIO()
+#         image.save(buffered, format="PNG")
+#         buffered.seek(0)
+#         upload_file = UploadFile(filename="generated_image.png", file=buffered)
+#         file_location = upload_to_s3(upload_file, content_type="image/png")
+#         return file_location
 
-    def parse_response(self, response):
-        rgb_data = response["result_img"]
-        rgb_array = np.array(rgb_data, dtype=np.uint8)
-        image = Image.fromarray(rgb_array, 'RGB')
+#     def parse_response(self, response):
+#         rgb_data = response["result_img"]
+#         rgb_array = np.array(rgb_data, dtype=np.uint8)
+#         image = Image.fromarray(rgb_array, 'RGB')
 
-        # 로컬에 이미지 저장
-        file_location = self.save_image_locally(image)
+#         # 로컬에 이미지 저장
+#         file_location = self.save_image_locally(image)
 
-        return {
-            "result": {
-                "image": file_location,
-                "text": response["result_text"]
-            }
-        }
+#         return {
+#             "result": {
+#                 "image": file_location,
+#                 "text": response["result_text"]
+#             }
+#         }
 
 
 HUGGINGFACE_TASKS = {
     "cxr-to-report-generation": CXRToReportGeneration,
     "report-to-cxr-generation": ReportToCXRGeneration,
-    "cxr-visual-qestion-answering": CXRVQA,
+    # "cxr-visual-qestion-answering": CXRVQA,
 }
 
 

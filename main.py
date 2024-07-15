@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uvicorn
 import logging
+import traceback
 import asyncio
 import requests
 import json
@@ -157,7 +158,8 @@ async def execute_tasks(request: ModelExecutionRequest):
         ]
 
     except Exception as e:
-        logger.error(f"Failed to execute tasks: {e}")
+        error_message = f"Failed to execute tasks: {e}\n{traceback.format_exc()}"
+        logger.error(error_message)
         return []
 
 @app.post("/generate-response")
