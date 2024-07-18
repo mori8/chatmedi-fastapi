@@ -3,7 +3,7 @@ import json
 import logging
 
 import aiohttp
-from langchain import LLMChain
+from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain.prompts import load_prompt

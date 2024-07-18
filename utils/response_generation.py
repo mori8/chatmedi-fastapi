@@ -1,7 +1,7 @@
 import json
 import logging
 
-from langchain import LLMChain
+from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.prompts import load_prompt
 from pydantic import BaseModel

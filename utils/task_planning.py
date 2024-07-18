@@ -1,10 +1,9 @@
 import logging
 
-from langchain import LLMChain
+from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
-from langchain.chat_models import ChatOpenAI as OpenAI
+from langchain_openai import ChatOpenAI as OpenAI
 from langchain.prompts import load_prompt
-from langchain.prompts import PromptTemplate
 
 from utils.exceptions import TaskPlanningException, wrap_exceptions
 from utils.history import ConversationHistory

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import requests
 from PIL import Image, ImageDraw
-from langchain import LLMChain
+from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from langchain.prompts import load_prompt
 from pydantic import BaseModel, Json
