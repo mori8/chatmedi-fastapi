@@ -1,7 +1,7 @@
 import copy
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from utils.exceptions import TaskParsingException, wrap_exceptions
 
@@ -64,8 +64,8 @@ class Task(BaseModel):
             return arg_key.startswith("generated " + resource_type)
 
 
-class Tasks(BaseModel):
-    __root__: list[Task] = Field(description="List of Machine Learning tasks")
+class Tasks(RootModel):
+    root: list[Task] = Field(description="List of Machine Learning tasks")
 
     def __iter__(self):
         return iter(self.__root__)
