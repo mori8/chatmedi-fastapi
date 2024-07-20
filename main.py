@@ -80,6 +80,10 @@ class ModelExecutionRequest(BaseModel):
     selected_models: Dict[int, Model]
 
 
+with open("resources/huggingface-models-metadata.jsonl") as f:
+    alternative_models = [json.loads(line) for line in f]
+
+
 @app.post("/parse-task", response_model=List[TaskResponse])
 async def parse_task(prompt: str = Form(...), image: Optional[UploadFile] = File(None)):
     # task_parsing 모듈의 기능을 사용하여 프롬프트를 파싱
@@ -178,6 +182,14 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
 async def upload_image(file: UploadFile = File(...)):
     file_location = upload_to_s3(file)
     return {"filename": file.filename, "url": f"/files/{file.filename}"}
+
+
+@app.get("/available-models")
+def get_available_models(task: str) -> List[str]:
+    available_models = [model["id"] for model in alternative_models if task in model["tasks"]]
+    if not available_models:
+        raise HTTPException(status_code=404, detail="No models available for the given task.")
+    return available_models
 
 # @app.get("/files/{filename}")
 # async def get_image(filename: str):
