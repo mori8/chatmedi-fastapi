@@ -72,6 +72,7 @@ class ModelSelectionRequest(BaseModel):
     tasks: List[TaskResponse]
 
 class ModelSelectionResponse(BaseModel):
+    prompt: str
     selected_models: Dict[int, Model]
 
 class ModelExecutionRequest(BaseModel):
@@ -118,7 +119,7 @@ async def select_model(request: ModelSelectionRequest):
             model_selection_llm=llms.model_selection_llm,
             output_fixing_llm=llms.output_fixing_llm,
         )
-        return ModelSelectionResponse(selected_models=selected_models)
+        return ModelSelectionResponse(prompt=request.user_input, selected_models=selected_models)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -153,7 +154,7 @@ async def execute_tasks(request: ModelExecutionRequest):
 
         return [
             TaskSummaryResponse(
-                task=TaskResponse(**summary.task.dict()),
+                task=Task(**summary.task.dict()),  # TaskResponse를 Task로 변환
                 model=summary.model,
                 model_input=summary.model_input,
                 inference_result=summary.inference_result["result"]

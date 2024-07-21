@@ -72,7 +72,7 @@ def infer_huggingface(task: Task, model_id: str, session: requests.Session):
                 endpoint = model_data["endpoint"]
                 break
     
-    huggingface_task = create_huggingface_task(task=task)
+    huggingface_task = create_huggingface_task(task=task, model_id=model_id)
     data = huggingface_task.inference_inputs
     # print(data)
     headers = get_hf_headers()
@@ -93,6 +93,22 @@ def infer_huggingface(task: Task, model_id: str, session: requests.Session):
         logger.error(f"Request failed: {e}")
         raise
 
+def load_model_metadata(file_path):
+    model_metadata = {}
+    with open(file_path, 'r') as f:
+        for line in f:
+            model_info = json.loads(line)
+            model_metadata[model_info['id']] = model_info
+    return model_metadata
+
+
+def get_model_input_format(model_id):
+    model_metadata = load_model_metadata('resources/huggingface-models-metadata.jsonl')
+    model_info = model_metadata.get(model_id)
+    if not model_info:
+        raise ValueError(f"Model {model_id} not found in metadata.")
+    
+    return model_info.get('inputs', {})
 
 # NLP Tasks
 
@@ -324,8 +340,9 @@ class ObjectDetection:
 
 # Example added to task-planning-examples.json compared to original paper
 class ImageClassification:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -336,8 +353,9 @@ class ImageClassification:
 
 
 class ImageToText:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -349,8 +367,9 @@ class ImageToText:
 
 # Audio Tasks
 class TextToSpeech:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -363,8 +382,9 @@ class TextToSpeech:
 
 
 class AudioToAudio:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -380,8 +400,9 @@ class AudioToAudio:
 
 
 class AutomaticSpeechRecognition:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -392,8 +413,9 @@ class AutomaticSpeechRecognition:
 
 
 class AudioClassification:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -404,8 +426,9 @@ class AudioClassification:
 
 
 class TextGeneration:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -414,9 +437,11 @@ class TextGeneration:
     def parse_response(self, response):
         return response.json()
 
+
 class CXRToReportGeneration:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
@@ -450,22 +475,33 @@ class CXRToReportGeneration:
                 "text": response["result_text"]
             }
         }
-    
+
+
 class ReportToCXRGeneration:
-    def __init__(self, task: Task):
+    def __init__(self, task: Task, model_id: str):
         self.task = task
+        self.model_id = model_id
 
     @property
     def inference_inputs(self):
-        data = {
-            "inputs": {
-                "instruction": "Generate a chest X-ray image that corresponds to the entered free-text radiology reports for the chest X-ray image.",
-                "input": self.task.args["text"],
+        model_input_format = get_model_input_format(self.model_id)
+        if isinstance(model_input_format, dict):
+            data = {
+                "inputs": {
+                    "instruction": model_input_format["instruction"],
+                    "input": self.task.args["text"]
+                }
             }
-        }
+        elif model_input_format == "text":
+            data = {
+                "inputs": self.task.args["text"]
+            }
+        else:
+            raise ValueError("Unknown input format for model")
+
         return data
 
-    def save_image_locally(self, image: Image) -> str:
+    def save_image_s3(self, image: Image) -> str:
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         buffered.seek(0)
@@ -474,17 +510,27 @@ class ReportToCXRGeneration:
         return file_location
 
     def parse_response(self, response):
-        rgb_data = response["result_img"]
-        rgb_array = np.array(rgb_data, dtype=np.uint8)
-        image = Image.fromarray(rgb_array, 'RGB')
-        
-        # 로컬에 이미지 저장
-        file_location = self.save_image_locally(image)
+        if "result_img" in response:
+            rgb_data = response["result_img"]
+            rgb_array = np.array(rgb_data, dtype=np.uint8)
+            image = Image.fromarray(rgb_array, 'RGB')
+            
+            file_location = self.save_image_s3(image)
 
-        return {"result": {
-            "image": file_location,
-            "text": ""
-        }}
+            return {"result": {
+                "image": file_location,
+                "text": ""
+            }}
+        else:
+            # response를 직접 처리
+            image = Image.open(BytesIO(response))
+            
+            file_location = self.save_image_s3(image)
+
+            return {"result": {
+                "image": file_location,
+                "text": ""
+            }}
     
 
 # class CXRVQA:
@@ -534,9 +580,9 @@ HUGGINGFACE_TASKS = {
 }
 
 
-def create_huggingface_task(task: Task):
+def create_huggingface_task(task: Task, model_id: str):
     if task.task in HUGGINGFACE_TASKS:
-        return HUGGINGFACE_TASKS[task.task](task)
+        return HUGGINGFACE_TASKS[task.task](task, model_id)
     else:
         raise NotImplementedError(f"Task {task.task} not supported")
 
