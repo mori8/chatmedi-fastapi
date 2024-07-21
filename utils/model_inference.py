@@ -522,9 +522,9 @@ class ReportToCXRGeneration:
                 "text": ""
             }}
         else:
-            # response를 직접 처리
-            image = Image.open(BytesIO(response))
-            
+            image_data = base64.b64decode(response)
+            image = Image.open(BytesIO(image_data))
+
             file_location = self.save_image_s3(image)
 
             return {"result": {
