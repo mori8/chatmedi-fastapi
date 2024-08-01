@@ -154,6 +154,58 @@ async def execute_tasks(request: ModelExecutionRequest):
         error_message = f"Failed to execute tasks: {e}\n{traceback.format_exc()}"
         logger.error(error_message)
         return []
+    
+@app.post("/execute-model", response_model=List[TaskSummaryResponse])
+async def execute_model(request: ModelExecutionRequest):
+    try:
+        # Model Inference
+        # task = request.task  # 단일 task 가정
+        # logger.info(f"Starting task: {task}")
+        
+        # if task.depends_on_generated_resources():
+        #     task = task.replace_generated_resources(task_summaries=[])
+
+        # model = request.selected_models[task.id]
+        
+        # with requests.Session() as session:
+        #     # TODO: infer에서 task가 string으로 입력되는거 반영해야함
+        #     inference_result = infer(
+        #         task=task,
+        #         model_id=model.id,
+        #         llm=llms.model_inference_llm,
+        #         session=session,
+        #     )
+        
+        # task_summary = TaskSummary(
+        #     task=task,
+        #     model=model,
+        #     model_input=task.args,
+        #     inference_result=json.dumps(inference_result),
+        # )
+        
+        # logger.info(f"Finished task: {task}")
+        # logger.debug(f"Task summary: {task_summary}")
+
+        # return TaskSummaryResponse(
+        #     task=task_summary.task,  # TaskResponse를 Task로 변환
+        #     model=task_summary.model,
+        #     inference_result=task_summary.inference_result["result"]
+        # )
+        return TaskSummaryResponse(
+            inference_result={
+                "result": "This is the result of the model execution."
+            }
+        )
+
+    except Exception as e:
+        error_message = f"Failed to execute task: {e}\n{traceback.format_exc()}"
+        logger.error(error_message)
+        return TaskSummaryResponse(
+            task=None,
+            model=None,
+            model_input=None,
+            inference_result=None
+        )
 
 @app.post("/generate-response")
 async def generate_response_endpoint(request: GenerateResponseRequest):

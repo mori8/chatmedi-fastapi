@@ -8,6 +8,7 @@ from langchain.llms.base import BaseLLM
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain.prompts import load_prompt
 from pydantic import BaseModel, Field
+from typing import Any
 
 from utils.exceptions import ModelSelectionException, async_wrap_exceptions
 from utils.model_scraper import get_top_k_models
@@ -20,6 +21,8 @@ logger = logging.getLogger(__name__)
 class Model(BaseModel):
     id: str = Field(description="ID of the model")
     reason: str = Field(description="Reason for selecting this model")
+    task: str
+    model_args: Any
 
 
 async def select_hf_models(
