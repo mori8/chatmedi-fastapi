@@ -52,12 +52,12 @@ class TaskResponse(BaseModel):
     dep: List[int]
     args: Dict[str, str]
 
-class TaskSummaryResponse(BaseModel):
+class ModelExecutionResult(BaseModel):
     inference_result: Dict[str, str]
 
 class GenerateResponseRequest(BaseModel):
     user_input: str
-    task_summaries: List[TaskSummaryResponse]
+    execution_result: ModelExecutionResult
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
@@ -69,7 +69,6 @@ class ModelSelectionResponse(BaseModel):
 
 class ModelExecutionRequest(BaseModel):
     user_input: str
-    task: str
     selected_model: Model
 
 
@@ -111,7 +110,7 @@ def select_model(request: ModelSelectionRequest):
     }
     return response
 
-@app.post("/execute-tasks", response_model=List[TaskSummaryResponse])
+@app.post("/execute-tasks", response_model=List[ModelExecutionResult])
 async def execute_tasks(request: ModelExecutionRequest):
     try:
         # Model Inference
@@ -141,7 +140,7 @@ async def execute_tasks(request: ModelExecutionRequest):
         logger.debug(f"Task summaries: {task_summaries}")
 
         return [
-            TaskSummaryResponse(
+            ModelExecutionResult(
                 task=Task(**summary.task.dict()),  # TaskResponse를 Task로 변환
                 model=summary.model,
                 model_input=summary.model_input,
@@ -155,11 +154,11 @@ async def execute_tasks(request: ModelExecutionRequest):
         logger.error(error_message)
         return []
     
-@app.post("/execute-model", response_model=List[TaskSummaryResponse])
+@app.post("/execute-model", response_model=ModelExecutionResult)
 async def execute_model(request: ModelExecutionRequest):
     try:
         # Model Inference
-        # task = request.task  # 단일 task 가정
+        # task = request.selected_model.task  # 단일 task 가정
         # logger.info(f"Starting task: {task}")
         
         # if task.depends_on_generated_resources():
@@ -186,12 +185,12 @@ async def execute_model(request: ModelExecutionRequest):
         # logger.info(f"Finished task: {task}")
         # logger.debug(f"Task summary: {task_summary}")
 
-        # return TaskSummaryResponse(
+        # return ModelExecutionResult(
         #     task=task_summary.task,  # TaskResponse를 Task로 변환
         #     model=task_summary.model,
         #     inference_result=task_summary.inference_result["result"]
         # )
-        return TaskSummaryResponse(
+        return ModelExecutionResult(
             inference_result={
                 "result": "This is the result of the model execution."
             }
@@ -200,10 +199,7 @@ async def execute_model(request: ModelExecutionRequest):
     except Exception as e:
         error_message = f"Failed to execute task: {e}\n{traceback.format_exc()}"
         logger.error(error_message)
-        return TaskSummaryResponse(
-            task=None,
-            model=None,
-            model_input=None,
+        return ModelExecutionResult(
             inference_result=None
         )
 
@@ -211,8 +207,9 @@ async def execute_model(request: ModelExecutionRequest):
 async def generate_response_endpoint(request: GenerateResponseRequest):
     try:
         response = generate_response(
+            # TODO: task_summaries -> execution_results로 변경한거 함수내에서 반영해야함
             user_input=request.user_input,
-            task_summaries=request.task_summaries,
+            execution_result=request.execution_result,
             llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
         )
         return {"response": response}
