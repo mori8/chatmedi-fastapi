@@ -21,7 +21,7 @@ from utils.task_parsing import parse_tasks, Task
 from utils.task_planning import plan_tasks
 from utils.model_selection import select_hf_models, Model, Task as ModelTask
 from utils.model_inference import infer, TaskSummary
-from utils.response_generation import generate_response, format_response, TaskSummariesForFinalResponse
+from utils.response_generation import generate_response
 
 
 load_dotenv()
@@ -53,19 +53,11 @@ class TaskResponse(BaseModel):
     args: Dict[str, str]
 
 class TaskSummaryResponse(BaseModel):
-    task: Task
-    model: Model
-    model_input: Dict[str, str]
-    inference_result: Dict[str, str]
-
-class TaskSummariesForFinalResponse(BaseModel):
-    task: Task
-    model: Model
     inference_result: Dict[str, str]
 
 class GenerateResponseRequest(BaseModel):
     user_input: str
-    task_summaries: List[TaskSummariesForFinalResponse]
+    task_summaries: List[TaskSummaryResponse]
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
@@ -77,8 +69,8 @@ class ModelSelectionResponse(BaseModel):
 
 class ModelExecutionRequest(BaseModel):
     user_input: str
-    tasks: List[Task]
-    selected_models: Dict[int, Model]
+    task: str
+    selected_model: Model
 
 
 with open("resources/huggingface-models-metadata.jsonl") as f:
@@ -107,21 +99,17 @@ async def plan_task(prompt: str = Form(...), history: Optional[str] = Form(None)
         return []
     
 @app.post("/select-model", response_model=ModelSelectionResponse)
-async def select_model(request: ModelSelectionRequest):
-    try:
-        tasks_sorted = sorted(request.tasks, key=lambda t: max(t.dep))
-        # ModelTask 형식으로 변환
-        model_tasks = [ModelTask(task=t.task, id=t.id, dep=t.dep, args=t.args) for t in tasks_sorted]
-        
-        selected_models = await select_hf_models(
-            user_input=request.user_input,
-            tasks=model_tasks,
-            model_selection_llm=llms.model_selection_llm,
-            output_fixing_llm=llms.output_fixing_llm,
-        )
-        return ModelSelectionResponse(prompt=request.user_input, selected_models=selected_models)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def select_model(request: ModelSelectionRequest):
+    response = {
+        "id": "llm-dxr",
+        "reason": "This model is the best model for the given task.",
+        "task": "cxr-to-report-generation",
+        "input_args": {
+            "instruction": "Generate a report based on the given chest X-ray image.",
+            "input": "[]",
+        },
+    }
+    return response
 
 @app.post("/execute-tasks", response_model=List[TaskSummaryResponse])
 async def execute_tasks(request: ModelExecutionRequest):
