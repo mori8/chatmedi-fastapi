@@ -22,7 +22,7 @@ class Model(BaseModel):
     id: str = Field(description="ID of the model")
     reason: str = Field(description="Reason for selecting this model")
     task: str
-    model_args: Any
+    input_args: Any
 
 
 async def select_hf_models(

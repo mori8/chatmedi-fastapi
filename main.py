@@ -57,19 +57,28 @@ class ModelExecutionResult(BaseModel):
 
 class GenerateResponseRequest(BaseModel):
     user_input: str
-    execution_result: ModelExecutionResult
+    selected_model: Model
+    inference_result: Dict[str, str]
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
-    tasks: List[TaskResponse]
 
 class ModelSelectionResponse(BaseModel):
-    prompt: str
-    selected_models: Dict[int, Model]
+    id: str
+    reason: str
+    task: str
+    input_args: Dict[str, str]
 
 class ModelExecutionRequest(BaseModel):
-    user_input: str
-    selected_model: Model
+    id: str
+    reason: str
+    task: str
+    input_args: Dict[str, str]
+
+class FinalReportResponse(BaseModel):
+    report: str
+
+    
 
 
 with open("resources/huggingface-models-metadata.jsonl") as f:
@@ -108,7 +117,7 @@ def select_model(request: ModelSelectionRequest):
             "input": "Bilateral, diffuse, confluent pulmonary opacities. Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.",
         },
     }
-    return response
+    return ModelSelectionResponse(**response)
 
 @app.post("/execute-tasks", response_model=List[ModelExecutionResult])
 async def execute_tasks(request: ModelExecutionRequest):
@@ -204,7 +213,7 @@ async def execute_model(request: ModelExecutionRequest):
             inference_result=None
         )
 
-@app.post("/generate-response")
+@app.post("/final-report", response_model=FinalReportResponse)
 async def generate_response_endpoint(request: GenerateResponseRequest):
     try:
         # response = generate_response(
@@ -213,7 +222,7 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
         #     execution_result=request.execution_result,
         #     llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
         # )
-        response = """
+        report = """
         ### Direct Response\n\n
         # Based on the provided radiology report, here is the generated chest X-ray image that corresponds to the description of \"Bilateral, diffuse, confluent pulmonary opacities.
         # Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n![Generated Chest X-ray](https://chatmedi-s3.s3.ap-northeast-2.amazonaws.com/a377d40d-b06f-4e12-8108-8a9bbce35bba.png)\n\n
@@ -224,7 +233,7 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
         3. **Inference Process**:\n   - The model processed the input text to generate a corresponding chest X-ray image.\n   - The generated image reflects the described conditions: bilateral, diffuse, confluent pulmonary opacities, which are indicative of severe pulmonary edema, ARDS, or hemorrhage.\n\n
         4. **Inference Result**:\n   - **Generated Image**: The image link provided above.\n   - **Text**: No additional text was generated as the primary output was the image.\n\nI hope this meets your needs! If you have any further questions or need additional modifications, feel free to ask.
         """
-        return {"response": response}
+        return {"report": report}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
