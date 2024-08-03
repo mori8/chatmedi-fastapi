@@ -216,22 +216,9 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
-    file_location = upload_to_s3(file)
-    return {"filename": file.filename, "url": f"/files/{file.filename}"}
-
-
 @app.get("/available-models")
 def get_available_models(task: str) -> List[str]:
     available_models = [model["id"] for model in alternative_models if task in model["tasks"]]
     if not available_models:
         raise HTTPException(status_code=404, detail="No models available for the given task.")
     return available_models
-
-# @app.get("/files/{filename}")
-# async def get_image(filename: str):
-#     file_location = UPLOAD_DIR / filename
-#     if file_location.exists():
-#         return FileResponse(file_location)
-#     return {"error": "File not found"}
