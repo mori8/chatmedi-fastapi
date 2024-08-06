@@ -161,23 +161,24 @@ async def execute_model(request: ModelExecutionRequest):
 @app.post("/final-report", response_model=FinalReportResponse)
 async def generate_response_endpoint(request: GenerateResponseRequest):
     try:
-        # response = generate_response(
-        #     # TODO: task_summaries -> execution_results로 변경한거 함수내에서 반영해야함
-        #     user_input=request.user_input,
-        #     execution_result=request.execution_result,
-        #     llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
-        # )
-        report = '''### Direct Response\n\n
-        # Based on the provided radiology report, here is the generated chest X-ray image that corresponds to the description of \"Bilateral, diffuse, confluent pulmonary opacities.
-        # Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n![Generated Chest X-ray](https://chatmedi-s3.s3.ap-northeast-2.amazonaws.com/a377d40d-b06f-4e12-8108-8a9bbce35bba.png)\n\n
-        # ### Detailed Workflow\n\n
-        1. **Task Identification**:\n   - **Task**: Report-to-CXR Generation\n   - **Input**: \"Bilateral, diffuse, confluent pulmonary opacities. Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n
-        2. **Model Selection**:\n   - **Model Used**: BISPL-KAIST/llm-cxr\n   - **Reason for Selection**: This model is specifically designed for chest X-ray image understanding and generation tasks.
-        It is an instruction-finetuned LLM, which means it can handle complex text inputs like the provided radiology report. The model supports multiple CXR-related tasks, indicating a comprehensive understanding of chest X-ray imagery.\n\n
-        3. **Inference Process**:\n   - The model processed the input text to generate a corresponding chest X-ray image.\n   - The generated image reflects the described conditions: bilateral, diffuse, confluent pulmonary opacities, which are indicative of severe pulmonary edema, ARDS, or hemorrhage.\n\n
-        4. **Inference Result**:\n   - **Generated Image**: The image link provided above.\n   - **Text**: No additional text was generated as the primary output was the image.\n\nI hope this meets your needs! If you have any further questions or need additional modifications, feel free to ask.'''
+        report = generate_response(
+            # TODO: task_summaries -> execution_results로 변경한거 함수내에서 반영해야함
+            user_input=request.user_input,
+            selected_model=request.selected_model,
+            inference_result=request.inference_result,
+            llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
+        )
+        # report = '''### Direct Response\n\n
+        # # Based on the provided radiology report, here is the generated chest X-ray image that corresponds to the description of \"Bilateral, diffuse, confluent pulmonary opacities.
+        # # Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n![Generated Chest X-ray](https://chatmedi-s3.s3.ap-northeast-2.amazonaws.com/a377d40d-b06f-4e12-8108-8a9bbce35bba.png)\n\n
+        # # ### Detailed Workflow\n\n
+        # 1. **Task Identification**:\n   - **Task**: Report-to-CXR Generation\n   - **Input**: \"Bilateral, diffuse, confluent pulmonary opacities. Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n
+        # 2. **Model Selection**:\n   - **Model Used**: BISPL-KAIST/llm-cxr\n   - **Reason for Selection**: This model is specifically designed for chest X-ray image understanding and generation tasks.
+        # It is an instruction-finetuned LLM, which means it can handle complex text inputs like the provided radiology report. The model supports multiple CXR-related tasks, indicating a comprehensive understanding of chest X-ray imagery.\n\n
+        # 3. **Inference Process**:\n   - The model processed the input text to generate a corresponding chest X-ray image.\n   - The generated image reflects the described conditions: bilateral, diffuse, confluent pulmonary opacities, which are indicative of severe pulmonary edema, ARDS, or hemorrhage.\n\n
+        # 4. **Inference Result**:\n   - **Generated Image**: The image link provided above.\n   - **Text**: No additional text was generated as the primary output was the image.\n\nI hope this meets your needs! If you have any further questions or need additional modifications, feel free to ask.'''
         
-        return {"report": report}
+        return { "report": report }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
