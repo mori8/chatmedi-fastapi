@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import uvicorn
 import logging
 import traceback
@@ -19,7 +19,7 @@ from utils.history import ConversationHistory
 from utils.llm_factory import LLMs, create_llms
 from utils.task_parsing import parse_tasks, Task
 from utils.task_planning import plan_tasks
-from utils.model_selection import select_hf_models, Model, Task as ModelTask
+from utils.model_selection import select_hf_model_for_task, Model, Task as ModelTask
 from utils.model_inference import infer, TaskSummary
 from utils.response_generation import generate_response
 
@@ -53,7 +53,7 @@ class TaskResponse(BaseModel):
     args: Dict[str, str]
 
 class ModelExecutionResult(BaseModel):
-    inference_result: Dict[str, str]
+    inference_result: dict
 
 class GenerateResponseRequest(BaseModel):
     user_input: str
@@ -62,6 +62,8 @@ class GenerateResponseRequest(BaseModel):
 
 class ModelSelectionRequest(BaseModel):
     user_input: str
+    task: str
+    context: Any
 
 class ModelSelectionResponse(BaseModel):
     id: str
@@ -107,110 +109,53 @@ async def plan_task(prompt: str = Form(...), history: Optional[str] = Form(None)
         return []
     
 @app.post("/select-model", response_model=ModelSelectionResponse)
-def select_model(request: ModelSelectionRequest):
-    response = {
-        "id": "llm-dxr",
-        "reason": "This model is specifically designed for chest X-ray image understanding and generation tasks, including report-to-CXR generation which matches the given task. It is described as an instruction-finetuned LLM, suggesting it can handle complex text inputs like the provided radiology report. The model also supports multiple CXR-related tasks, indicating a more comprehensive understanding of chest X-ray imagery. While both models support the required task, the BISPL-KAIST/llm-cxr model appears to be more specialized and versatile for medical imaging tasks.",
-        "task": "report-to-cxr-generation",
-        "input_args": {
-            "instruction": "Generate a report based on the given chest X-ray image.",
-            "input": "Bilateral, diffuse, confluent pulmonary opacities. Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.",
-        },
-    }
-    return ModelSelectionResponse(**response)
-
-@app.post("/execute-tasks", response_model=List[ModelExecutionResult])
-async def execute_tasks(request: ModelExecutionRequest):
+async def select_model_endpoint(request: ModelSelectionRequest):
     try:
-        # Model Inference
-        task_summaries = []
-        with requests.Session() as session:
-            for task in request.tasks:
-                logger.info(f"Starting task: {task}")
-                if task.depends_on_generated_resources():
-                    task = task.replace_generated_resources(task_summaries=task_summaries)
-                model = request.selected_models[task.id]
-                inference_result = infer(
-                    task=task,
-                    model_id=model.id,
-                    llm=llms.model_inference_llm,
-                    session=session,
-                )
-                task_summaries.append(
-                    TaskSummary(
-                        task=task,
-                        model=model,
-                        model_input=task.args,
-                        inference_result=json.dumps(inference_result),
-                    )
-                )
-                logger.info(f"Finished task: {task}")
-        logger.info("Finished all tasks")
-        logger.debug(f"Task summaries: {task_summaries}")
-
-        return [
-            ModelExecutionResult(
-                task=Task(**summary.task.dict()),  # TaskResponse를 Task로 변환
-                model=summary.model,
-                model_input=summary.model_input,
-                inference_result=summary.inference_result["result"]
-            )
-            for summary in task_summaries
-        ]
-
+        selected_model = await select_hf_model_for_task(
+            user_input=request.user_input,
+            task=request.task,
+            context=request.context,
+            model_selection_llm=llms.model_selection_llm,
+            output_fixing_llm=llms.output_fixing_llm
+        )
+        return ModelSelectionResponse(
+            id=selected_model.id,
+            reason=selected_model.reason,
+            task=selected_model.task,
+            input_args=selected_model.input_args
+        )
     except Exception as e:
-        error_message = f"Failed to execute tasks: {e}\n{traceback.format_exc()}"
-        logger.error(error_message)
-        return []
-    
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
 @app.post("/execute-model", response_model=ModelExecutionResult)
 async def execute_model(request: ModelExecutionRequest):
+    print(request)
     try:
         # Model Inference
-        # task = request.selected_model.task  # 단일 task 가정
-        # logger.info(f"Starting task: {task}")
-        
-        # if task.depends_on_generated_resources():
-        #     task = task.replace_generated_resources(task_summaries=[])
+        logger.info(f"Starting task: {request.task}")
 
-        # model = request.selected_models[task.id]
+        with requests.Session() as session:
+            inference_result = infer(
+                task=request.task,
+                model_id=request.id,
+                input_args=request.input_args,
+                session=session,
+            )
         
-        # with requests.Session() as session:
-        #     # TODO: infer에서 task가 string으로 입력되는거 반영해야함
-        #     inference_result = infer(
-        #         task=task,
-        #         model_id=model.id,
-        #         llm=llms.model_inference_llm,
-        #         session=session,
-        #     )
-        
-        # task_summary = TaskSummary(
-        #     task=task,
-        #     model=model,
-        #     model_input=task.args,
-        #     inference_result=json.dumps(inference_result),
-        # )
-        
-        # logger.info(f"Finished task: {task}")
-        # logger.debug(f"Task summary: {task_summary}")
+        logger.info(f"Finished task: {request.task}")
+        logger.debug(f"Infernece result: {inference_result['result']}")
 
-        # return ModelExecutionResult(
-        #     task=task_summary.task,  # TaskResponse를 Task로 변환
-        #     model=task_summary.model,
-        #     inference_result=task_summary.inference_result["result"]
-        # )
         return ModelExecutionResult(
-            inference_result={
-                "image": "https://chatmedi-s3.s3.ap-northeast-2.amazonaws.com/a377d40d-b06f-4e12-8108-8a9bbce35bba.png",
-                "text": ""
-            }
+            inference_result=inference_result['result']
         )
 
     except Exception as e:
         error_message = f"Failed to execute task: {e}\n{traceback.format_exc()}"
         logger.error(error_message)
         return ModelExecutionResult(
-            inference_result=None
+            inference_result={"error": error_message}
         )
 
 @app.post("/final-report", response_model=FinalReportResponse)
@@ -222,8 +167,7 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
         #     execution_result=request.execution_result,
         #     llm=llms.response_generation_llm,  # Ensure llms is defined and properly initialized
         # )
-        report = """
-        ### Direct Response\n\n
+        report = '''### Direct Response\n\n
         # Based on the provided radiology report, here is the generated chest X-ray image that corresponds to the description of \"Bilateral, diffuse, confluent pulmonary opacities.
         # Differential diagnoses include severe pulmonary edema ARDS or hemorrhage.\"\n\n![Generated Chest X-ray](https://chatmedi-s3.s3.ap-northeast-2.amazonaws.com/a377d40d-b06f-4e12-8108-8a9bbce35bba.png)\n\n
         # ### Detailed Workflow\n\n
@@ -231,8 +175,8 @@ async def generate_response_endpoint(request: GenerateResponseRequest):
         2. **Model Selection**:\n   - **Model Used**: BISPL-KAIST/llm-cxr\n   - **Reason for Selection**: This model is specifically designed for chest X-ray image understanding and generation tasks.
         It is an instruction-finetuned LLM, which means it can handle complex text inputs like the provided radiology report. The model supports multiple CXR-related tasks, indicating a comprehensive understanding of chest X-ray imagery.\n\n
         3. **Inference Process**:\n   - The model processed the input text to generate a corresponding chest X-ray image.\n   - The generated image reflects the described conditions: bilateral, diffuse, confluent pulmonary opacities, which are indicative of severe pulmonary edema, ARDS, or hemorrhage.\n\n
-        4. **Inference Result**:\n   - **Generated Image**: The image link provided above.\n   - **Text**: No additional text was generated as the primary output was the image.\n\nI hope this meets your needs! If you have any further questions or need additional modifications, feel free to ask.
-        """
+        4. **Inference Result**:\n   - **Generated Image**: The image link provided above.\n   - **Text**: No additional text was generated as the primary output was the image.\n\nI hope this meets your needs! If you have any further questions or need additional modifications, feel free to ask.'''
+        
         return {"report": report}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

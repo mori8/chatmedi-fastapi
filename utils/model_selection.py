@@ -25,88 +25,76 @@ class Model(BaseModel):
     input_args: Any
 
 
-async def select_hf_models(
-    user_input: str,
-    tasks: list[Task],
-    model_selection_llm: BaseLLM,
-    output_fixing_llm: BaseLLM,
-) -> dict[int, Model]:
-    """Use LLM agent to select the best available HuggingFace model for each task, given model metadata.
-    Runs concurrently."""
-    async with aiohttp.ClientSession() as session:
-        async with asyncio.TaskGroup() as tg:
-            aio_tasks = []
-            for task in tasks:
-                aio_tasks.append(
-                    tg.create_task(
-                        select_model(
-                            user_input=user_input,
-                            task=task,
-                            model_selection_llm=model_selection_llm,
-                            output_fixing_llm=output_fixing_llm,
-                            session=session,
-                        )
-                    )
-                )
-        try:
-            results = await asyncio.gather(*aio_tasks)
-        except Exception as e:
-            logger.error(f"Error occurred: {e}")
-            raise
-        return {task_id: model for task_id, model in results}
-
-
-@async_wrap_exceptions(ModelSelectionException, "Failed to select model")
+# @async_wrap_exceptions(ModelSelectionException, "Failed to select model")
 async def select_model(
+    task: str,
+    context: Any,
     user_input: str,
-    task: Task,
     model_selection_llm: BaseLLM,
     output_fixing_llm: BaseLLM,
-    session: aiohttp.ClientSession,
-) -> (int, Model):
-    logger.info(f"Starting model selection for task: {task.task}")
+):
+    logger.info(f"Starting model selection for task: {task}")
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            top_k_models = await get_top_k_models(
+                task=task, top_k=5, max_description_length=100, session=session
+            )
+        except Exception as e:
+            logger.error(f"Error fetching top k models for task {task}: {e}")
+            raise
 
     try:
-        top_k_models = await get_top_k_models(
-            task=task.task, top_k=5, max_description_length=100, session=session
+        prompt_template = load_prompt(
+            get_prompt_resource("model-selection-prompt.json")
         )
+        llm_chain = LLMChain(prompt=prompt_template, llm=model_selection_llm)
+
+        # Prepare the context string
+        context_str = ""
+        if hasattr(context, 'text') and context.text:
+            context_str += f"Text: {context.text} "
+        if hasattr(context, 'image') and context.image:
+            context_str += f"Image: {context.image}"
+
+        context_str = context_str.strip()  # Remove any trailing whitespace
+
+        models_str = json.dumps(top_k_models).replace('"', "'")
+        output = await llm_chain.apredict(
+            user_input=user_input, task=task, context=context_str, models=models_str, stop=["<im_end>"]
+        )
+        logger.debug(f"Model selection raw output: {output}")
+
+        parser = PydanticOutputParser(pydantic_object=Model)
+        fixing_parser = OutputFixingParser.from_llm(
+            parser=parser, llm=output_fixing_llm
+        )
+        model = fixing_parser.parse(output)
     except Exception as e:
-        logger.error(f"Error fetching top k models for task {task.task}: {e}")
+        logger.error(f"Error during model selection for task {task}: {e}")
         raise
 
-    if task.task in [
-        "summarization",
-        "translation",
-        "conversational",
-        "text-generation",
-        "text2text-generation",
-    ]:
-        model = Model(
-            id="openai",
-            reason="Text generation tasks are best handled by OpenAI models",
+    logger.info(f"For task: {task}, selected model: {model}")
+    return model
+
+
+async def select_hf_model_for_task(
+    user_input: str,
+    task: str,
+    context: Any,
+    model_selection_llm: BaseLLM,
+    output_fixing_llm: BaseLLM,
+) -> Model:
+    """Use LLM agent to select the best available HuggingFace model for a given task, given model metadata."""
+    try:
+        model = await select_model(
+            user_input=user_input,
+            task=task,
+            context=context,
+            model_selection_llm=model_selection_llm,
+            output_fixing_llm=output_fixing_llm,
         )
-    else:
-        try:
-            prompt_template = load_prompt(
-                get_prompt_resource("model-selection-prompt.json")
-            )
-            llm_chain = LLMChain(prompt=prompt_template, llm=model_selection_llm)
-            # Need to replace double quotes with single quotes for correct response generation
-            task_str = task.json().replace('"', "'")
-            models_str = json.dumps(top_k_models).replace('"', "'")
-            output = await llm_chain.apredict(
-                user_input=user_input, task=task_str, models=models_str, stop=["<im_end>"]
-            )
-            logger.debug(f"Model selection raw output: {output}")
-
-            parser = PydanticOutputParser(pydantic_object=Model)
-            fixing_parser = OutputFixingParser.from_llm(
-                parser=parser, llm=output_fixing_llm
-            )
-            model = fixing_parser.parse(output)
-        except Exception as e:
-            logger.error(f"Error during model selection for task {task.task}: {e}")
-            raise
-
-    logger.info(f"For task: {task.task}, selected model: {model}")
-    return task.id, model
+    except Exception as e:
+        logger.error(f"Error occurred: {e}")
+        raise
+    return model

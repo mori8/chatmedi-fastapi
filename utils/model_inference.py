@@ -39,30 +39,10 @@ logger = logging.getLogger(__name__)
 
 
 # @wrap_exceptions(ModelInferenceException, "Error during model inference")
-def infer(task: Task, model_id: str, llm: BaseLLM, session: requests.Session):
-    """Execute a task either with LLM or huggingface inference API."""
-    if model_id == "openai":
-        return infer_openai(task=task, llm=llm)
-    else:
-        return infer_huggingface(task=task, model_id=model_id, session=session)
+def infer(task: str, model_id: str, input_args: Any, session: requests.Session):
+    return infer_huggingface(task=task, model_id=model_id, input_args=input_args, session=session)
 
-
-def infer_openai(task: Task, llm: BaseLLM):
-    logger.info("Starting OpenAI inference")
-    prompt_template = load_prompt(
-        get_prompt_resource("openai-model-inference-prompt.json")
-    )
-    llm_chain = LLMChain(prompt=prompt_template, llm=llm)
-    # Need to replace double quotes with single quotes for correct response generation
-    output = llm_chain.predict(
-        task=task.json(), task_name=task.task, args=task.args, stop=["<im_end>"]
-    )
-    result = {"generated text": output}
-    logger.debug(f"Inference result: {result}")
-    return result
-
-
-def infer_huggingface(task: Task, model_id: str, session: requests.Session):
+def infer_huggingface(task: str, model_id: str, input_args: Any, session: requests.Session):
     logger.info("Starting huggingface inference")
 
     with open("resources/huggingface-models-metadata.jsonl") as f:
@@ -73,8 +53,10 @@ def infer_huggingface(task: Task, model_id: str, session: requests.Session):
                 break
     
     huggingface_task = create_huggingface_task(task=task, model_id=model_id)
-    data = huggingface_task.inference_inputs
-    # print(data)
+    data = {
+        "inputs": input_args
+    }
+    print(data)
     headers = get_hf_headers()
     # print(headers)
     try:
@@ -101,6 +83,11 @@ def load_model_metadata(file_path):
             model_metadata[model_info['id']] = model_info
     return model_metadata
 
+def convert_to_json(args):
+    if isinstance(args, (dict, list, tuple)):
+        return json.dumps(args)
+    else:
+        return args
 
 def get_model_input_format(model_id):
     model_metadata = load_model_metadata('resources/huggingface-models-metadata.jsonl')
@@ -439,7 +426,7 @@ class TextGeneration:
 
 
 class CXRToReportGeneration:
-    def __init__(self, task: Task, model_id: str):
+    def __init__(self, task: str, model_id: str):
         self.task = task
         self.model_id = model_id
 
@@ -478,7 +465,7 @@ class CXRToReportGeneration:
 
 
 class ReportToCXRGeneration:
-    def __init__(self, task: Task, model_id: str):
+    def __init__(self, task: str, model_id: str):
         self.task = task
         self.model_id = model_id
 
@@ -580,11 +567,11 @@ HUGGINGFACE_TASKS = {
 }
 
 
-def create_huggingface_task(task: Task, model_id: str):
-    if task.task in HUGGINGFACE_TASKS:
-        return HUGGINGFACE_TASKS[task.task](task, model_id)
+def create_huggingface_task(task: str, model_id: str):
+    if task in HUGGINGFACE_TASKS:
+        return HUGGINGFACE_TASKS[task](task, model_id)
     else:
-        raise NotImplementedError(f"Task {task.task} not supported")
+        raise NotImplementedError(f"Task {task} not supported")
 
 
 class TaskSummary(BaseModel):
