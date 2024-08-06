@@ -22,18 +22,17 @@ class TaskSummariesForFinalResponse(BaseModel):
 
 # @wrap_exceptions(ResponseGenerationException, "Failed to generate assistant response")
 def generate_response(
-    user_input: str, task_summaries: List[TaskSummariesForFinalResponse], llm: BaseLLM
+    user_input: str, selected_model: Model, inference_result: Dict[str, str], llm: BaseLLM
 ) -> str:
     """Use LLM agent to generate a response to the user's input, given task results."""
     logger.info("Starting response generation")
-    sorted_task_summaries = sorted(task_summaries, key=lambda ts: ts.task.id)
-    task_results_str = task_summaries_to_json(sorted_task_summaries)
     prompt_template = load_prompt(
         get_prompt_resource("response-generation-prompt.json")
     )
+    infefence_result_str = json.dumps(inference_result)
     llm_chain = LLMChain(prompt=prompt_template, llm=llm)
     response = llm_chain.predict(
-        user_input=user_input, task_results=task_results_str, stop=["<im_end>"]
+        user_input=user_input, selected_model=selected_model, inference_results=infefence_result_str, stop=["<im_end>"]
     )
     logger.info(f"Generated response: {response}")
     return response
