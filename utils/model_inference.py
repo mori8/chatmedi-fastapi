@@ -62,28 +62,6 @@ def infer_huggingface(task: str, model_id: str, input_args: Any, session: reques
         logger.error(f"Request failed: {e}")
         raise
 
-def load_model_metadata(file_path):
-    model_metadata = {}
-    with open(file_path, 'r') as f:
-        for line in f:
-            model_info = json.loads(line)
-            model_metadata[model_info['id']] = model_info
-    return model_metadata
-
-def convert_to_json(args):
-    if isinstance(args, (dict, list, tuple)):
-        return json.dumps(args)
-    else:
-        return args
-
-def get_model_input_format(model_id):
-    model_metadata = load_model_metadata('resources/huggingface-models-metadata.jsonl')
-    model_info = model_metadata.get(model_id)
-    if not model_info:
-        raise ValueError(f"Model {model_id} not found in metadata.")
-    
-    return model_info.get('inputs', {})
-
 # NLP Tasks
 
 class CXRToReportGeneration:

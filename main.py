@@ -19,7 +19,7 @@ from utils.history import ConversationHistory
 from utils.llm_factory import LLMs, create_llms
 from utils.task_parsing import parse_tasks, Task
 from utils.task_planning import plan_tasks
-from utils.model_selection import select_hf_model_for_task, Model, Task as ModelTask
+from utils.model_selection import select_hf_model_for_task, Model, Task as ModelTask, generate_model_input_args
 from utils.model_inference import infer, TaskSummary
 from utils.response_generation import generate_response
 
@@ -80,7 +80,11 @@ class ModelExecutionRequest(BaseModel):
 class FinalReportResponse(BaseModel):
     report: str
 
-    
+class ModelArgsRequest(BaseModel):
+    user_input: str
+    model_id: str
+    task: str
+    context: Any
 
 
 with open("resources/huggingface-models-metadata.jsonl") as f:
@@ -188,3 +192,14 @@ def get_available_models(task: str) -> List[str]:
     if not available_models:
         raise HTTPException(status_code=404, detail="No models available for the given task.")
     return available_models
+
+@app.post("/model-args")
+async def generate_model_args(request: ModelArgsRequest) -> Dict[str, Any]:
+    model_input = await generate_model_input_args(
+        user_input=request.user_input,
+        task=request.task,
+        context=request.context,
+        model_id=request.model_id,
+        model_selection_llm=llms.model_selection_llm
+    )
+    return model_input

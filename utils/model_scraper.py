@@ -57,3 +57,18 @@ def filter_available_models(candidates):
     """Filters out models that do not have an endpoint defined in the metadata."""
     available_models = [c for c in candidates if c.get("endpoint")]
     return available_models
+
+def load_model_metadata(file_path):
+    model_metadata = {}
+    with open(file_path, 'r') as f:
+        for line in f:
+            model_info = json.loads(line)
+            model_metadata[model_info['id']] = model_info
+    return model_metadata
+
+def get_single_model_info(model_id):
+    model_metadata = load_model_metadata('resources/huggingface-models-metadata.jsonl')
+    model_info = model_metadata.get(model_id)
+    if not model_info:
+        raise ValueError(f"Model {model_id} not found in metadata.")
+    return model_info
