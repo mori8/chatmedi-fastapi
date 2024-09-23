@@ -44,7 +44,7 @@ def infer_huggingface(task: str, model_id: str, input_args: Any, session: reques
     huggingface_task = create_huggingface_task(task=task, model_id=model_id, input_args=input_args)
     data = huggingface_task.inference_inputs
     # print(data)
-    headers = get_hf_headers()
+    headers = get_hf_headers(model_id)
     # print(headers)
     try:
         response = session.post(endpoint, headers=headers, json=data)
@@ -173,7 +173,9 @@ class ClinicalNoteAnalysis:
 
     def parse_response(self, response):
         return {
-            "result": response
+            "result": {
+                "text": response[0]['generated_text']
+            }
         }
 
 HUGGINGFACE_TASKS = {
