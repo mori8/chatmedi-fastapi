@@ -21,10 +21,10 @@ def read_huggingface_models_metadata():
 
 HUGGINGFACE_MODELS_MAP = read_huggingface_models_metadata()
 
-@async_wrap_exceptions(
-    ModelScrapingException,
-    "Failed to find compatible models already loaded in the huggingface inference API.",
-)
+# @async_wrap_exceptions(
+#     ModelScrapingException,
+#     "Failed to find compatible models already loaded in the huggingface inference API.",
+# )
 async def get_top_k_models(
     task: str, top_k: int, max_description_length: int, session: ClientSession
 ):
@@ -48,6 +48,7 @@ async def get_top_k_models(
             "model_card": model.get("model_card", "")[:max_description_length],
             "tasks": model.get("tasks", []),
             "endpoint": model.get("endpoint", ""),
+            "inputs": model.get("inputs", []),
         }
         for model in top_k_available_models
     ]
