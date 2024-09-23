@@ -144,9 +144,42 @@ class ReportToCXRGeneration:
                 "text": ""
             }}
 
+
+class ClinicalNoteAnalysis:
+    def __init__(self, task: str, model_id: str, input_args: Any):
+        self.task = task
+        self.model_id = model_id
+        self.input_args = input_args
+        self.prompt = """You are an intelligent clinical language model.
+        Below is a snippet of patient's discharge summary and a following instruction from healthcare professional.
+        Write a response that appropriately completes the instruction.
+        The response should provide the accurate answer to the instruction, while being concise.
+
+        [Discharge Summary Begin]
+        {note}
+        [Discharge Summary End]
+
+        [Instruction Begin]
+        {question}
+        [Instruction End] 
+        """
+
+    @property
+    def inference_inputs(self):
+        note = self.input_args.get("note", "")
+        question = self.input_args.get("question", "")
+        model_input = self.prompt.format(note=note, question=question)
+        return {"inputs": model_input}
+
+    def parse_response(self, response):
+        return {
+            "result": response
+        }
+
 HUGGINGFACE_TASKS = {
     "cxr-to-report-generation": CXRToReportGeneration,
     "report-to-cxr-generation": ReportToCXRGeneration,
+    "clinical-note-analysis": ClinicalNoteAnalysis
 }
 
 def create_huggingface_task(task: str, model_id: str, input_args: Any):
