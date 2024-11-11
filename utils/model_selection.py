@@ -52,13 +52,7 @@ async def select_model(
         llm_chain = LLMChain(prompt=prompt_template, llm=model_selection_llm)
 
         # Prepare the context string
-        context_str = ""
-        if hasattr(context, 'text') and context.text:
-            context_str += f"Text: {context.text} "
-        if hasattr(context, 'image') and context.image:
-            context_str += f"Image: {context.image}"
-
-        context_str = context_str.strip()  # Remove any trailing whitespace
+        context_str = str(context)
 
         models_str = json.dumps(top_k_models).replace('"', "'")
         output = await llm_chain.apredict(

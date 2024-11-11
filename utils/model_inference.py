@@ -174,7 +174,7 @@ class ClinicalNoteAnalysis:
     def parse_response(self, response):
         return {
             "result": {
-                "text": response[0]['generated_text']
+                "text": response[0]["generated_text"].split("[Instruction End]")[1].strip()
             }
         }
 
